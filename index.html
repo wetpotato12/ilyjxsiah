@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f5f4ef" />
+  <title>WIP — ilyjxsiah</title>
+  <style>
+    :root { color-scheme: light; --paper:#f5f4ef; --ink:#20201e; --muted:#77766f; --line:#d9d8d1; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100svh; background:var(--paper); color:var(--ink); font-family:Arial, Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+    button { font:inherit; cursor:pointer; }
+    .page { min-height:100svh; display:flex; flex-direction:column; padding:clamp(22px,4vw,58px); }
+    header, footer { display:flex; justify-content:space-between; align-items:center; gap:16px; font-size:12px; font-weight:600; letter-spacing:-.02em; }
+    .mark { font-weight:800; letter-spacing:-.055em; font-size:17px; }
+    .dim { color:var(--muted); font-weight:400; }
+    main { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; }
+    h1 { margin:0 0 24px -.055em; font-size:clamp(115px,24vw,390px); font-weight:800; letter-spacing:-.105em; line-height:.78; }
+    .action { background:transparent; border:1px solid var(--ink); color:var(--ink); border-radius:999px; padding:13px 19px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:34px; }
+    .action:hover, .action:focus-visible { background:var(--ink); color:var(--paper); }
+    .overlay[hidden] { display:none; }
+    .overlay { position:fixed; inset:0; background:rgba(22,22,20,.36); display:flex; justify-content:center; align-items:center; padding:18px; z-index:10; }
+    .modal { width:min(100%,520px); background:var(--paper); border:1px solid var(--ink); padding:clamp(24px,5vw,38px); box-shadow:10px 10px 0 rgba(0,0,0,.12); }
+    .modal-top { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .eyebrow { font-size:11px; text-transform:uppercase; letter-spacing:.13em; font-weight:700; }
+    .close { border:1px solid var(--line); background:transparent; border-radius:50%; width:35px; height:35px; font-size:20px; line-height:1; }
+    .close:hover { border-color:var(--ink); }
+    h2 { font-size:clamp(40px,9vw,72px); line-height:.94; letter-spacing:-.075em; margin:38px 0 15px; }
+    .status { display:flex; align-items:center; gap:9px; font-size:14px; margin-bottom:35px; }
+    .dot { width:9px; height:9px; background:#9c9b95; border-radius:50%; flex:none; }
+    .dot.online { background:#268351; } .dot.offline { background:#b84a40; }
+    .rows { border-top:1px solid var(--line); }
+    .data-row { display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid var(--line); font-size:13px; }
+    .data-row span:first-child { color:var(--muted); } .data-row span:last-child { text-align:right; overflow-wrap:anywhere; }
+    .modal-actions { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; align-items:center; margin-top:25px; }
+    .small { font-size:11px; color:var(--muted); }
+    .text-button { padding:7px 0; background:none; border:none; border-bottom:1px solid var(--ink); font-size:12px; font-weight:600; }
+    .text-button:hover { opacity:.6; }
+    @media(max-width:600px) { .page { padding:24px; } header,footer { font-size:11px; } h1 { font-size:clamp(105px,31vw,200px); } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header><div class="mark">ilyjxsiah<span aria-hidden="true">.</span></div><div class="dim">PERSONAL SITE / IN PROGRESS</div></header>
+    <main>
+      <h1>WIP.</h1>
+      <button class="action" id="openStatus" type="button">Server status <span aria-hidden="true">↗</span></button>
+    </main>
+    <footer><span>© <span id="year"></span> ilyjxsiah</span><span class="dim">STILL BUILDING.</span></footer>
+  </div>
+  <div class="overlay" id="overlay" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-top"><span class="eyebrow">Minecraft / Server status</span><button class="close" id="closeStatus" type="button" aria-label="Close status window">×</button></div>
+      <h2 id="modalTitle">Server status.</h2>
+      <div class="status" aria-live="polite"><span class="dot" id="dot"></span><span id="state">Checking server…</span></div>
+      <div class="rows">
+        <div class="data-row"><span>Address</span><span>mc.ilyjxsiah.com</span></div>
+        <div class="data-row"><span>Players</span><span id="players">—</span></div>
+        <div class="data-row"><span>Version</span><span id="version">—</span></div>
+        <div class="data-row"><span>Last checked</span><span id="checked">—</span></div>
+      </div>
+      <div class="modal-actions"><button class="text-button" id="copyIp" type="button">Copy server IP ↗</button><button class="text-button" id="refresh" type="button">Refresh ↻</button></div>
+      <p class="small">Status provided by mcsrvstat.us · Updates every 60 seconds</p>
+    </section>
+  </div>
+  <script>
+    const ADDRESS='mc.ilyjxsiah.com';
+    const overlay=document.getElementById('overlay');
+    const openButton=document.getElementById('openStatus');
+    const dot=document.getElementById('dot');
+    const state=document.getElementById('state');
+    let lastFocused=null;
+    let pending=null;
+    let requestId=0;
+    document.getElementById('year').textContent=new Date().getFullYear();
+    function setText(id,value){document.getElementById(id).textContent=value;}
+    async function fetchStatus(){
+      const current=++requestId;
+      dot.className='dot'; state.textContent='Checking server…';
+      try {
+        const controller=new AbortController();
+        const timeout=setTimeout(()=>controller.abort(),10000);
+        let response;
+        try {response=await fetch('https://api.mcsrvstat.us/3/'+encodeURIComponent(ADDRESS)+'?t='+Date.now(),{cache:'no-store',signal:controller.signal});}
+        finally {clearTimeout(timeout);}
+        if(!response.ok) throw new Error('Status API unavailable');
+        const data=await response.json();
+        if(current!==requestId)return;
+        if(data.online){
+          dot.className='dot online';state.textContent='Online';
+          setText('players',typeof data.players?.online==='number' ? `${data.players.online} / ${data.players.max ?? '?'}` : 'Unavailable');
+          setText('version',data.version || 'Unavailable');
+        }else{
+          dot.className='dot offline';state.textContent='Offline';
+          setText('players','—');setText('version','—');
+        }
+      }catch(e){
+        if(current!==requestId)return;
+        dot.className='dot';state.textContent='Unable to check status';
+        setText('players','—');setText('version','—');
+      }
+      if(current===requestId)setText('checked',new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+    }
+    function openModal(){lastFocused=document.activeElement;overlay.hidden=false;document.getElementById('closeStatus').focus();fetchStatus();pending=setInterval(fetchStatus,60000);}
+    function closeModal(){overlay.hidden=true;clearInterval(pending);requestId++;lastFocused?.focus();}
+    openButton.addEventListener('click',openModal);
+    document.getElementById('closeStatus').addEventListener('click',closeModal);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden)closeModal();});
+    document.getElementById('refresh').addEventListener('click',fetchStatus);
+    document.getElementById('copyIp').addEventListener('click',async()=>{
+      const button=document.getElementById('copyIp');
+      try {await navigator.clipboard.writeText(ADDRESS);button.textContent='Copied ✓';}
+      catch {button.textContent='Copy unavailable';}
+      setTimeout(()=>button.textContent='Copy server IP ↗',1800);
+    });
+  </script>
+</body>
+</html>
